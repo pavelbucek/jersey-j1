@@ -38,33 +38,10 @@
  * holder.
  */
 
-package org.glassfish.jersey.examples.java8;
-
-import javax.ws.rs.ApplicationPath;
-
-import org.glassfish.jersey.examples.java8.resources.DefaultMethodResource;
-import org.glassfish.jersey.examples.java8.resources.LambdaResource;
-import org.glassfish.jersey.examples.java8.resources.OptionalResource;
-import org.glassfish.jersey.jackson.JacksonFeature;
-import org.glassfish.jersey.java8.Java8TypesFeature;
-import org.glassfish.jersey.server.ResourceConfig;
-
 /**
- * Application for illustrating some of the features of Java 8 in JAX-RS.
+ * Jersey extension module providing support for types added in Java 8 (e.g. Optional).
  *
- * @author Michal Gajdos
+ * @since 2.18
  */
-@ApplicationPath("j8")
-public class Java8Application extends ResourceConfig {
+package org.glassfish.jersey.java8;
 
-    public Java8Application() {
-        // Features/Providers.
-        register(Java8TypesFeature.class);
-        register(JacksonFeature.class);
-
-        // Resources.
-        register(OptionalResource.class);
-        register(DefaultMethodResource.class);
-        register(LambdaResource.class);
-    }
-}

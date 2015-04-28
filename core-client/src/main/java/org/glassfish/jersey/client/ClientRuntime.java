@@ -62,6 +62,7 @@ import org.glassfish.jersey.internal.util.collection.LazyValue;
 import org.glassfish.jersey.internal.util.collection.Value;
 import org.glassfish.jersey.internal.util.collection.Values;
 import org.glassfish.jersey.message.MessageBodyWorkers;
+import org.glassfish.jersey.message.internal.spi.EntityChangeInterceptor;
 import org.glassfish.jersey.process.internal.ChainableStage;
 import org.glassfish.jersey.process.internal.RequestScope;
 import org.glassfish.jersey.process.internal.Stage;
@@ -90,7 +91,9 @@ class ClientRuntime implements JerseyClient.ShutdownHook {
     private final LazyValue<ExecutorService> asyncRequestExecutor;
 
     private final ServiceLocator locator;
+
     private final Iterable<ClientLifecycleListener> lifecycleListeners;
+    private final Iterable<EntityChangeInterceptor> entityInterceptors;
 
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
@@ -127,6 +130,7 @@ class ClientRuntime implements JerseyClient.ShutdownHook {
         this.locator = locator;
 
         this.lifecycleListeners = Providers.getAllProviders(locator, ClientLifecycleListener.class);
+        this.entityInterceptors = Providers.getAllProviders(locator, EntityChangeInterceptor.class);
 
         for (final ClientLifecycleListener listener : lifecycleListeners) {
             try {
@@ -349,5 +353,15 @@ class ClientRuntime implements JerseyClient.ShutdownHook {
      */
     ServiceLocator getServiceLocator() {
         return locator;
+    }
+
+    /**
+     * Get {@link org.glassfish.jersey.message.internal.spi.EntityChangeInterceptor entity change interceptors} for current
+     * runtime.
+     *
+     * @return available entity change interceptors.
+     */
+    Iterable<EntityChangeInterceptor> getEntityInterceptors() {
+        return entityInterceptors;
     }
 }

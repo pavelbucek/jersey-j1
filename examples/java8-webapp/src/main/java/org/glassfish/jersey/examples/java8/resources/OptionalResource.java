@@ -38,33 +38,57 @@
  * holder.
  */
 
-package org.glassfish.jersey.examples.java8;
+package org.glassfish.jersey.examples.java8.resources;
 
-import javax.ws.rs.ApplicationPath;
+import java.util.Optional;
 
-import org.glassfish.jersey.examples.java8.resources.DefaultMethodResource;
-import org.glassfish.jersey.examples.java8.resources.LambdaResource;
-import org.glassfish.jersey.examples.java8.resources.OptionalResource;
-import org.glassfish.jersey.jackson.JacksonFeature;
-import org.glassfish.jersey.java8.Java8TypesFeature;
-import org.glassfish.jersey.server.ResourceConfig;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
+import javax.ws.rs.HeaderParam;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+
+import org.glassfish.jersey.examples.java8.model.TwoValueHolder;
+import org.glassfish.jersey.examples.java8.model.ValueHolder;
 
 /**
- * Application for illustrating some of the features of Java 8 in JAX-RS.
+ * Resource showing supported {@link java.util.Optional} usages.
  *
- * @author Michal Gajdos
+ * @author Michal Gajdos (michal.gajdos at oracle.com)
  */
-@ApplicationPath("j8")
-public class Java8Application extends ResourceConfig {
+@Path("optional")
+@Produces("text/plain")
+public class OptionalResource {
 
-    public Java8Application() {
-        // Features/Providers.
-        register(Java8TypesFeature.class);
-        register(JacksonFeature.class);
+    @GET
+    @Path("empty")
+    public Optional<String> getEmpty() {
+        // An empty Optional returned means HTTP 204 response.
+        return Optional.empty();
+    }
 
-        // Resources.
-        register(OptionalResource.class);
-        register(DefaultMethodResource.class);
-        register(LambdaResource.class);
+    @GET
+    @Path("string")
+    public Optional<String> getString() {
+        return Optional.of("foo");
+    }
+
+    @GET
+    @Path("param-string")
+    public String getParamString(@QueryParam("foo") final Optional<String> foo) {
+        return foo.orElse("baz");
+    }
+
+    @POST
+    @Path("json")
+    @Produces("application/json")
+    @Consumes("application/json")
+    public Optional<TwoValueHolder> postJson(@HeaderParam("foo") @DefaultValue("23") final Optional<Integer> foo,
+                                             final Optional<ValueHolder> entity) {
+        // Value in foo cannot be null because of the @DefaultValue.
+        return entity.map(holder -> new TwoValueHolder(holder.getValue(), foo.get()));
     }
 }

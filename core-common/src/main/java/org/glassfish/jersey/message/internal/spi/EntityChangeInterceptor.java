@@ -38,33 +38,47 @@
  * holder.
  */
 
-package org.glassfish.jersey.examples.java8;
+package org.glassfish.jersey.message.internal.spi;
 
-import javax.ws.rs.ApplicationPath;
+import javax.ws.rs.core.GenericType;
 
-import org.glassfish.jersey.examples.java8.resources.DefaultMethodResource;
-import org.glassfish.jersey.examples.java8.resources.LambdaResource;
-import org.glassfish.jersey.examples.java8.resources.OptionalResource;
-import org.glassfish.jersey.jackson.JacksonFeature;
-import org.glassfish.jersey.java8.Java8TypesFeature;
-import org.glassfish.jersey.server.ResourceConfig;
+import org.glassfish.jersey.spi.Contract;
 
 /**
- * Application for illustrating some of the features of Java 8 in JAX-RS.
+ * This interface is intended to unwrap entities (and their types) that shouldn't be processed by Jersey runtime directly.
+ * Examples of such an entities are Optional (JDK8, Guava), {@link org.glassfish.jersey.internal.util.collection.Value},
+ * {@link org.glassfish.jersey.internal.util.collection.Ref} etc. Outbound interceptors, filters and providers are given
+ * unwrapped entities (and their types) without a need to handle unwrapping themselves.
+ * <p/>
+ * Jersey tries available interceptors one-by-one until it finds the one that supports given entity.
+ * <p/>
+ * The wrapped entity can still be obtained via
+ * {@link org.glassfish.jersey.message.internal.OutboundMessageContext#getWrappedEntity()} method.
  *
- * @author Michal Gajdos
+ * @author Michal Gajdos (michal.gajdos at oracle.com)
+ * @since 2.18
  */
-@ApplicationPath("j8")
-public class Java8Application extends ResourceConfig {
+@Contract
+public interface EntityChangeInterceptor {
 
-    public Java8Application() {
-        // Features/Providers.
-        register(Java8TypesFeature.class);
-        register(JacksonFeature.class);
+    /**
+     * Unwrap given entity and return wrapped value instead.
+     *
+     * @param entity entity to be unwrapped.
+     * @return unwrapped entity (may be {@code null}) if this interceptor supports type of given entity or the original entity
+     * instead.
+     */
+    public Object unwrapEntity(Object entity);
 
-        // Resources.
-        register(OptionalResource.class);
-        register(DefaultMethodResource.class);
-        register(LambdaResource.class);
-    }
+    /**
+     * Unwrap given entity type and return wrapped entity type instead. If the type cannot be determined from the given
+     * {@code genericType} implementations can determine the type from given entity.
+     *
+     * @param genericType generic type to determine type of wrapped entity.
+     * @param entity      entity instance that can be used if the type cannot be obtained from {@code genericType}.
+     * @return generic type of unwrapped entity (may be {@code null}) or original generic type if the interceptor doesn't support
+     * the given entity type.
+     */
+    public GenericType unwrapType(GenericType genericType, Object entity);
+
 }

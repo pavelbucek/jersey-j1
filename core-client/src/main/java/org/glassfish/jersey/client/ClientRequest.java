@@ -122,6 +122,8 @@ public class ClientRequest extends OutboundMessageContext implements ClientReque
         this.requestUri = requestUri;
         this.clientConfig = clientConfig;
         this.propertiesDelegate = propertiesDelegate;
+
+        setEntityInterceptors(clientConfig.getRuntime().getEntityInterceptors());
     }
 
     /**

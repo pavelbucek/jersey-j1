@@ -38,33 +38,71 @@
  * holder.
  */
 
-package org.glassfish.jersey.examples.java8;
+package org.glassfish.jersey.java8;
 
-import javax.ws.rs.ApplicationPath;
+import java.util.Optional;
 
-import org.glassfish.jersey.examples.java8.resources.DefaultMethodResource;
-import org.glassfish.jersey.examples.java8.resources.LambdaResource;
-import org.glassfish.jersey.examples.java8.resources.OptionalResource;
-import org.glassfish.jersey.jackson.JacksonFeature;
-import org.glassfish.jersey.java8.Java8TypesFeature;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.client.Entity;
+import javax.ws.rs.core.Application;
+import javax.ws.rs.core.Response;
+
+import org.glassfish.jersey.message.internal.MessageBodyProviderNotFoundException;
 import org.glassfish.jersey.server.ResourceConfig;
+import org.glassfish.jersey.server.ServerProperties;
+import org.glassfish.jersey.test.JerseyTest;
+
+import org.junit.Test;
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertThat;
 
 /**
- * Application for illustrating some of the features of Java 8 in JAX-RS.
- *
- * @author Michal Gajdos
+ * @author Michal Gajdos (michal.gajdos at oracle.com)
  */
-@ApplicationPath("j8")
-public class Java8Application extends ResourceConfig {
+public class OptionalNegativeTest extends JerseyTest {
 
-    public Java8Application() {
-        // Features/Providers.
-        register(Java8TypesFeature.class);
-        register(JacksonFeature.class);
+    @Path("/")
+    @Produces("text/plain")
+    public static class OptionalResource {
 
-        // Resources.
-        register(OptionalResource.class);
-        register(DefaultMethodResource.class);
-        register(LambdaResource.class);
+        @GET
+        @Path("response")
+        public Response getResponse() {
+            return Response.ok(Optional.of("foo")).build();
+        }
+
+        @GET
+        @Path("param-string")
+        public String getParamString(@QueryParam("foo") final Optional<String> foo) {
+            return foo.orElse("baz");
+        }
+    }
+
+    @Override
+    protected Application configure() {
+        return new ResourceConfig(OptionalResource.class)
+                .property(ServerProperties.RESOURCE_VALIDATION_DISABLE, true);
+    }
+
+    @Test
+    public void testGetResponse() throws Exception {
+        final Response response = target("response").request().get();
+
+        assertThat("Application was able to process Optional type.", response.getStatus(), is(500));
+    }
+
+    @Test
+    public void testGetParamString() throws Exception {
+        final Response response = target("param-string").queryParam("foo", "bar").request().get();
+
+        assertThat("Application was able to process Optional type.", response.getStatus(), is(500));
+    }
+
+    @Test(expected = MessageBodyProviderNotFoundException.class)
+    public void testClientEntity() throws Exception {
+        target("nevermind").request().post(Entity.text(Optional.of("foo")));
     }
 }

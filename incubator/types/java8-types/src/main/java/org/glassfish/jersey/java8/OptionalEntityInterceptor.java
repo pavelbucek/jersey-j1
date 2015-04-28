@@ -38,33 +38,45 @@
  * holder.
  */
 
-package org.glassfish.jersey.examples.java8;
+package org.glassfish.jersey.java8;
 
-import javax.ws.rs.ApplicationPath;
+import java.util.Optional;
 
-import org.glassfish.jersey.examples.java8.resources.DefaultMethodResource;
-import org.glassfish.jersey.examples.java8.resources.LambdaResource;
-import org.glassfish.jersey.examples.java8.resources.OptionalResource;
-import org.glassfish.jersey.jackson.JacksonFeature;
-import org.glassfish.jersey.java8.Java8TypesFeature;
-import org.glassfish.jersey.server.ResourceConfig;
+import javax.ws.rs.core.GenericType;
+
+import org.glassfish.jersey.message.internal.spi.EntityChangeInterceptor;
 
 /**
- * Application for illustrating some of the features of Java 8 in JAX-RS.
+ * {@link org.glassfish.jersey.message.internal.spi.EntityChangeInterceptor Entity change interceptor} for
+ * {@link java.util.Optional} type.
  *
- * @author Michal Gajdos
+ * @author Michal Gajdos (michal.gajdos at oracle.com)
  */
-@ApplicationPath("j8")
-public class Java8Application extends ResourceConfig {
+@SuppressWarnings("unchecked")
+final class OptionalEntityInterceptor implements EntityChangeInterceptor {
 
-    public Java8Application() {
-        // Features/Providers.
-        register(Java8TypesFeature.class);
-        register(JacksonFeature.class);
+    @Override
+    public Object unwrapEntity(final Object entity) {
+        if (entity instanceof Optional) {
+            return ((Optional) entity).orElse(null);
+        }
 
-        // Resources.
-        register(OptionalResource.class);
-        register(DefaultMethodResource.class);
-        register(LambdaResource.class);
+        return entity;
+    }
+
+    @Override
+    public GenericType unwrapType(final GenericType genericType, Object entity) {
+        if (genericType.getRawType() == Optional.class) {
+            if (entity instanceof Optional) {
+                entity = ((Optional) entity).orElse(null);
+            }
+            final Class<?> fallback = entity == null ? null : entity.getClass();
+
+            return fallback != null
+                    ? new GenericType(Utils.optionalParamType(genericType.getType(), fallback).type())
+                    : null;
+        }
+
+        return genericType;
     }
 }

@@ -78,6 +78,7 @@ import org.glassfish.jersey.message.internal.MatchingEntityTag;
 import org.glassfish.jersey.message.internal.OutboundJaxrsResponse;
 import org.glassfish.jersey.message.internal.TracingAwarePropertiesDelegate;
 import org.glassfish.jersey.message.internal.VariantSelector;
+import org.glassfish.jersey.message.internal.spi.EntityChangeInterceptor;
 import org.glassfish.jersey.model.internal.RankedProvider;
 import org.glassfish.jersey.process.Inflector;
 import org.glassfish.jersey.server.internal.LocalizationMessages;
@@ -364,6 +365,18 @@ public class ContainerRequest extends InboundMessageContext
         return inflector instanceof ResourceMethodInvoker
                 ? ((ResourceMethodInvoker) inflector).getWriterInterceptors()
                 : processingProviders.getSortedGlobalWriterInterceptors();
+    }
+
+    /**
+     * Get all {@link org.glassfish.jersey.message.internal.spi.EntityChangeInterceptor entity change interceptors} applicable to
+     * this request.
+     *
+     * @return All entity change interceptors applicable to the matched inflector (or an empty collection if no inflector
+     * matched yet).
+     */
+    Iterable<EntityChangeInterceptor> getEntityChangeInterceptors() {
+        return processingProviders == null
+                ? Collections.<EntityChangeInterceptor>emptyList() : processingProviders.getEntityInterceptors();
     }
 
     private Inflector<RequestProcessingContext, ContainerResponse> getInflector() {

@@ -38,33 +38,65 @@
  * holder.
  */
 
-package org.glassfish.jersey.examples.java8;
-
-import javax.ws.rs.ApplicationPath;
-
-import org.glassfish.jersey.examples.java8.resources.DefaultMethodResource;
-import org.glassfish.jersey.examples.java8.resources.LambdaResource;
-import org.glassfish.jersey.examples.java8.resources.OptionalResource;
-import org.glassfish.jersey.jackson.JacksonFeature;
-import org.glassfish.jersey.java8.Java8TypesFeature;
-import org.glassfish.jersey.server.ResourceConfig;
+package org.glassfish.jersey.examples.java8.model;
 
 /**
- * Application for illustrating some of the features of Java 8 in JAX-RS.
- *
- * @author Michal Gajdos
+ * @author Michal Gajdos (michal.gajdos at oracle.com)
  */
-@ApplicationPath("j8")
-public class Java8Application extends ResourceConfig {
+public class TwoValueHolder {
 
-    public Java8Application() {
-        // Features/Providers.
-        register(Java8TypesFeature.class);
-        register(JacksonFeature.class);
+    private String valueOne;
+    private int valueTwo;
 
-        // Resources.
-        register(OptionalResource.class);
-        register(DefaultMethodResource.class);
-        register(LambdaResource.class);
+    public TwoValueHolder() {
+    }
+
+    public TwoValueHolder(final String valueOne, final int valueTwo) {
+        this.valueOne = valueOne;
+        this.valueTwo = valueTwo;
+    }
+
+    public String getValueOne() {
+        return valueOne;
+    }
+
+    public void setValueOne(final String valueOne) {
+        this.valueOne = valueOne;
+    }
+
+    public int getValueTwo() {
+        return valueTwo;
+    }
+
+    public void setValueTwo(final int valueTwo) {
+        this.valueTwo = valueTwo;
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        final TwoValueHolder that = (TwoValueHolder) o;
+
+        if (valueTwo != that.valueTwo) {
+            return false;
+        }
+        if (valueOne != null ? !valueOne.equals(that.valueOne) : that.valueOne != null) {
+            return false;
+        }
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = valueOne != null ? valueOne.hashCode() : 0;
+        result = 31 * result + valueTwo;
+        return result;
     }
 }

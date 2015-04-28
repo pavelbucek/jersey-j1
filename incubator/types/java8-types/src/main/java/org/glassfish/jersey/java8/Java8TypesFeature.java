@@ -38,33 +38,34 @@
  * holder.
  */
 
-package org.glassfish.jersey.examples.java8;
+package org.glassfish.jersey.java8;
 
-import javax.ws.rs.ApplicationPath;
+import javax.ws.rs.core.Feature;
+import javax.ws.rs.core.FeatureContext;
 
-import org.glassfish.jersey.examples.java8.resources.DefaultMethodResource;
-import org.glassfish.jersey.examples.java8.resources.LambdaResource;
-import org.glassfish.jersey.examples.java8.resources.OptionalResource;
-import org.glassfish.jersey.jackson.JacksonFeature;
-import org.glassfish.jersey.java8.Java8TypesFeature;
-import org.glassfish.jersey.server.ResourceConfig;
+import org.glassfish.jersey.Beta;
 
 /**
- * Application for illustrating some of the features of Java 8 in JAX-RS.
+ * Feature to register providers (filters, interceptors, param converters, ...) for types added to Java 8.
+ * <p/>
+ * Currently supported Java 8 types are:
+ * <ul>
+ * <li>{@link java.util.Optional}</li>
+ * </ul>
  *
- * @author Michal Gajdos
+ * @author Michal Gajdos (michal.gajdos at oracle.com)
+ * @since 2.18
  */
-@ApplicationPath("j8")
-public class Java8Application extends ResourceConfig {
+@Beta
+public final class Java8TypesFeature implements Feature {
 
-    public Java8Application() {
-        // Features/Providers.
-        register(Java8TypesFeature.class);
-        register(JacksonFeature.class);
+    @Override
+    public boolean configure(final FeatureContext context) {
+        // Optional.
+        context.register(OptionalParamConverterProvider.class);
+        context.register(OptionalMessageProvider.class);
+        context.register(OptionalEntityInterceptor.class);
 
-        // Resources.
-        register(OptionalResource.class);
-        register(DefaultMethodResource.class);
-        register(LambdaResource.class);
+        return true;
     }
 }

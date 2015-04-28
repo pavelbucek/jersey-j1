@@ -57,6 +57,7 @@ import javax.inject.Singleton;
 import org.glassfish.jersey.internal.inject.Providers;
 import org.glassfish.jersey.internal.inject.ReferencingFactory;
 import org.glassfish.jersey.internal.util.collection.Ref;
+import org.glassfish.jersey.message.internal.spi.EntityChangeInterceptor;
 import org.glassfish.jersey.model.internal.RankedComparator;
 import org.glassfish.jersey.model.internal.RankedProvider;
 
@@ -95,6 +96,7 @@ public class ProcessingProviders {
     private final Iterable<RankedProvider<WriterInterceptor>> globalWriterInterceptors;
     private final Iterable<WriterInterceptor> sortedGlobalWriterInterceptors;
     private final Iterable<DynamicFeature> dynamicFeatures;
+    private final Iterable<EntityChangeInterceptor> entityInterceptors;
 
     /**
      * Creates new instance of the processing providers.
@@ -114,6 +116,7 @@ public class ProcessingProviders {
      * @param globalReaderInterceptors Global {@link ReaderInterceptor reader interceptors}.
      * @param globalWriterInterceptors Global {@link WriterInterceptor writer interceptors}.
      * @param dynamicFeatures {@link DynamicFeature Dynamic features}.
+     * @param entityInterceptors {@link EntityChangeInterceptor entity change interceptors}.
      */
     public ProcessingProviders(
             MultivaluedMap<Class<? extends Annotation>, RankedProvider<ContainerRequestFilter>> nameBoundRequestFilters,
@@ -129,7 +132,8 @@ public class ProcessingProviders {
             Iterable<RankedProvider<ContainerResponseFilter>> globalResponseFilters,
             Iterable<RankedProvider<ReaderInterceptor>> globalReaderInterceptors,
             Iterable<RankedProvider<WriterInterceptor>> globalWriterInterceptors,
-            Iterable<DynamicFeature> dynamicFeatures) {
+            Iterable<DynamicFeature> dynamicFeatures,
+            Iterable<EntityChangeInterceptor> entityInterceptors) {
 
         this.nameBoundReaderInterceptors = nameBoundReaderInterceptors;
         this.nameBoundReaderInterceptorsInverse = nameBoundReaderInterceptorsInverse;
@@ -154,6 +158,8 @@ public class ProcessingProviders {
                 globalRequestFilters);
         this.sortedGlobalResponseFilters = Providers.sortRankedProviders(new RankedComparator<ContainerResponseFilter>(),
                 globalResponseFilters);
+
+        this.entityInterceptors = entityInterceptors;
     }
 
     /**
@@ -319,6 +325,16 @@ public class ProcessingProviders {
      */
     public Iterable<DynamicFeature> getDynamicFeatures() {
         return dynamicFeatures;
+    }
+
+    /**
+     * Get {@link org.glassfish.jersey.message.internal.spi.EntityChangeInterceptor entity change interceptors} for current
+     * runtime.
+     *
+     * @return available entity change interceptors.
+     */
+    public Iterable<EntityChangeInterceptor> getEntityInterceptors() {
+        return entityInterceptors;
     }
 
     /**

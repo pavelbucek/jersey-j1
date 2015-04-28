@@ -140,6 +140,14 @@
             <title>Release 2.18 Highlights</title>
 
             <section>
+                <title>Support for Java 8 Optional</title>
+                <para>
+                    New incubator module (<literal>jersey-types-java8</literal>) has been added to Jersey 2.18. This module is
+                    supposed to bring support for Java 8 types into Jersey (entity processing, parameter injection). Current
+                    support includes Optional from JDK 8.
+                </para>
+            </section>
+            <section>
                 <title>Updated to MOXy 2.6</title>
                 <para>
                     Jersey has updated version of MOXy (XML/JSON provider) to version 2.6. Among some bug fixes there are other

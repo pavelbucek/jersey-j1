@@ -73,6 +73,7 @@ import javax.ws.rs.ext.RuntimeDelegate;
 import org.glassfish.jersey.CommonProperties;
 import org.glassfish.jersey.internal.LocalizationMessages;
 import org.glassfish.jersey.internal.util.ReflectionHelper;
+import org.glassfish.jersey.message.internal.spi.EntityChangeInterceptor;
 
 import jersey.repackaged.com.google.common.base.Function;
 import jersey.repackaged.com.google.common.collect.Collections2;
@@ -84,6 +85,7 @@ import jersey.repackaged.com.google.common.collect.Lists;
  * @author Marek Potociar (marek.potociar at oracle.com)
  */
 public class OutboundMessageContext {
+
     private static final Annotation[] EMPTY_ANNOTATIONS = new Annotation[0];
     private static final List<MediaType> WILDCARD_ACCEPTABLE_TYPE_SINGLETON_LIST =
             Collections.<MediaType>singletonList(MediaTypes.WILDCARD_ACCEPTABLE_TYPE);
@@ -96,12 +98,17 @@ public class OutboundMessageContext {
     private Annotation[] entityAnnotations = EMPTY_ANNOTATIONS;
     private OutputStream entityStream;
 
+    private volatile Iterable<EntityChangeInterceptor> entityInterceptors;
+
+    private Object unwrappedEntity;
+    private GenericType<?> unwrappedEntityType;
 
     /**
      * The callback interface which is used to get the terminal output stream into which the entity should be
      * written and to inform the implementation about the entity size.
      */
     public static interface StreamProvider {
+
         /**
          * Get the output stream. This method will be called after all the
          * {@link javax.ws.rs.ext.WriterInterceptor writer interceptors} are called and written entity is buffered
@@ -113,7 +120,6 @@ public class OutboundMessageContext {
          * which will cause ignoring the written entity (in that case the entity will
          * still be written by {@link javax.ws.rs.ext.MessageBodyWriter message body writers}
          * but the output will be ignored).
-         *
          * @throws java.io.IOException in case of an IO error.
          */
         public OutputStream getOutputStream(int contentLength) throws IOException;
@@ -126,6 +132,7 @@ public class OutboundMessageContext {
         this.headers = HeaderUtils.createOutbound();
         this.committingOutputStream = new CommittingOutputStream();
         this.entityStream = committingOutputStream;
+        this.entityInterceptors = Collections.emptyList();
     }
 
     /**
@@ -134,7 +141,7 @@ public class OutboundMessageContext {
      *
      * @param original the original outbound message context.
      */
-    public OutboundMessageContext(OutboundMessageContext original) {
+    public OutboundMessageContext(final OutboundMessageContext original) {
         this.headers = HeaderUtils.createOutbound();
         this.headers.putAll(original.headers);
         this.committingOutputStream = new CommittingOutputStream();
@@ -143,6 +150,10 @@ public class OutboundMessageContext {
         this.entity = original.entity;
         this.entityType = original.entityType;
         this.entityAnnotations = original.entityAnnotations;
+
+        this.entityInterceptors = original.entityInterceptors;
+        this.unwrappedEntity = original.unwrappedEntity;
+        this.unwrappedEntityType = original.unwrappedEntityType;
     }
 
     /**
@@ -150,7 +161,7 @@ public class OutboundMessageContext {
      *
      * @param headers new headers.
      */
-    public void replaceHeaders(MultivaluedMap<String, Object> headers) {
+    public void replaceHeaders(final MultivaluedMap<String, Object> headers) {
         getHeaders().clear();
         if (headers != null) {
             getHeaders().putAll(headers);
@@ -169,7 +180,7 @@ public class OutboundMessageContext {
 
     /**
      * Get a message header as a single string value.
-     *
+     * <p/>
      * Each single header value is converted to String using a
      * {@link javax.ws.rs.ext.RuntimeDelegate.HeaderDelegate} if one is available
      * via {@link javax.ws.rs.ext.RuntimeDelegate#createHeaderDelegate(java.lang.Class)}
@@ -183,7 +194,7 @@ public class OutboundMessageContext {
      * more than once then the values of joined together and separated by a ','
      * character.
      */
-    public String getHeaderString(String name) {
+    public String getHeaderString(final String name) {
         return HeaderUtils.asHeaderString(headers.get(name), RuntimeDelegate.getInstance());
     }
 
@@ -199,7 +210,10 @@ public class OutboundMessageContext {
      *                    method returns the {@code null} without calling the converter.
      * @return value of the header, or (possibly converted) {@code null} if not present.
      */
-    private <T> T singleHeader(String name, Class<T> valueType, Function<String, T> converter, boolean convertNull) {
+    private <T> T singleHeader(final String name,
+                               final Class<T> valueType,
+                               final Function<String, T> converter,
+                               final boolean convertNull) {
         final List<Object> values = headers.get(name);
 
         if (values == null || values.isEmpty()) {
@@ -210,7 +224,7 @@ public class OutboundMessageContext {
                     HeaderValueException.Context.OUTBOUND);
         }
 
-        Object value = values.get(0);
+        final Object value = values.get(0);
         if (value == null) {
             return convertNull ? converter.apply(null) : null;
         }
@@ -220,13 +234,13 @@ public class OutboundMessageContext {
         } else {
             try {
                 return converter.apply(HeaderUtils.asString(value, null));
-            } catch (ProcessingException ex) {
+            } catch (final ProcessingException ex) {
                 throw exception(name, value, ex);
             }
         }
     }
 
-    private static HeaderValueException exception(final String headerName, Object headerValue, Exception e) {
+    private static HeaderValueException exception(final String headerName, final Object headerValue, final Exception e) {
         return new HeaderValueException(LocalizationMessages.UNABLE_TO_PARSE_HEADER_VALUE(headerName, headerValue), e,
                 HeaderValueException.Context.OUTBOUND);
     }
@@ -248,10 +262,10 @@ public class OutboundMessageContext {
     public Date getDate() {
         return singleHeader(HttpHeaders.DATE, Date.class, new Function<String, Date>() {
             @Override
-            public Date apply(String input) {
+            public Date apply(final String input) {
                 try {
                     return HttpHeaderReader.readDate(input);
-                } catch (ParseException e) {
+                } catch (final ParseException e) {
                     throw new ProcessingException(e);
                 }
             }
@@ -266,10 +280,10 @@ public class OutboundMessageContext {
     public Locale getLanguage() {
         return singleHeader(HttpHeaders.CONTENT_LANGUAGE, Locale.class, new Function<String, Locale>() {
             @Override
-            public Locale apply(String input) {
+            public Locale apply(final String input) {
                 try {
                     return new LanguageTag(input).getAsLocale();
-                } catch (ParseException e) {
+                } catch (final ParseException e) {
                     throw new ProcessingException(e);
                 }
             }
@@ -285,7 +299,7 @@ public class OutboundMessageContext {
     public MediaType getMediaType() {
         return singleHeader(HttpHeaders.CONTENT_TYPE, MediaType.class, new Function<String, MediaType>() {
             @Override
-            public MediaType apply(String input) {
+            public MediaType apply(final String input) {
                 return MediaType.valueOf(input);
             }
         }, false);
@@ -317,7 +331,7 @@ public class OutboundMessageContext {
                     conversionApplied = true;
                     result.addAll(HttpHeaderReader.readAcceptMediaType(HeaderUtils.asString(value, rd)));
                 }
-            } catch (java.text.ParseException e) {
+            } catch (final java.text.ParseException e) {
                 throw exception(HttpHeaders.ACCEPT, value, e);
             }
         }
@@ -326,7 +340,7 @@ public class OutboundMessageContext {
             // cache converted
             headers.put(HttpHeaders.ACCEPT, Lists.transform(result, new Function<MediaType, Object>() {
                 @Override
-                public Object apply(MediaType input) {
+                public Object apply(final MediaType input) {
                     return input;
                 }
             }));
@@ -361,11 +375,11 @@ public class OutboundMessageContext {
                             new Function<AcceptableLanguageTag, Locale>() {
 
                                 @Override
-                                public Locale apply(AcceptableLanguageTag input) {
+                                public Locale apply(final AcceptableLanguageTag input) {
                                     return input.getAsLocale();
                                 }
                             }));
-                } catch (java.text.ParseException e) {
+                } catch (final java.text.ParseException e) {
                     throw exception(HttpHeaders.ACCEPT_LANGUAGE, value, e);
                 }
             }
@@ -375,7 +389,7 @@ public class OutboundMessageContext {
             // cache converted
             headers.put(HttpHeaders.ACCEPT_LANGUAGE, Lists.transform(result, new Function<Locale, Object>() {
                 @Override
-                public Object apply(Locale input) {
+                public Object apply(final Locale input) {
                     return input;
                 }
             }));
@@ -395,8 +409,8 @@ public class OutboundMessageContext {
             return Collections.emptyMap();
         }
 
-        Map<String, Cookie> result = new HashMap<String, Cookie>();
-        for (String cookie : HeaderUtils.asStringList(cookies, RuntimeDelegate.getInstance())) {
+        final Map<String, Cookie> result = new HashMap<String, Cookie>();
+        for (final String cookie : HeaderUtils.asStringList(cookies, RuntimeDelegate.getInstance())) {
             if (cookie != null) {
                 result.putAll(HttpHeaderReader.readCookies(cookie));
             }
@@ -417,7 +431,7 @@ public class OutboundMessageContext {
         }
         try {
             return new HashSet<String>(HttpHeaderReader.readStringList(allowed));
-        } catch (java.text.ParseException e) {
+        } catch (final java.text.ParseException e) {
             throw exception(HttpHeaders.ALLOW, allowed, e);
         }
     }
@@ -431,10 +445,10 @@ public class OutboundMessageContext {
     public int getLength() {
         return singleHeader(HttpHeaders.CONTENT_LENGTH, Integer.class, new Function<String, Integer>() {
             @Override
-            public Integer apply(String input) {
+            public Integer apply(final String input) {
                 try {
                     return (input != null && !input.isEmpty()) ? Integer.parseInt(input) : -1;
-                } catch (NumberFormatException ex) {
+                } catch (final NumberFormatException ex) {
                     throw new ProcessingException(ex);
                 }
             }
@@ -447,15 +461,15 @@ public class OutboundMessageContext {
      * @return a read-only map of cookie name (String) to a {@link javax.ws.rs.core.NewCookie new cookie}.
      */
     public Map<String, NewCookie> getResponseCookies() {
-        List<Object> cookies = headers.get(HttpHeaders.SET_COOKIE);
+        final List<Object> cookies = headers.get(HttpHeaders.SET_COOKIE);
         if (cookies == null || cookies.isEmpty()) {
             return Collections.emptyMap();
         }
 
-        Map<String, NewCookie> result = new HashMap<String, NewCookie>();
-        for (String cookie : HeaderUtils.asStringList(cookies, RuntimeDelegate.getInstance())) {
+        final Map<String, NewCookie> result = new HashMap<String, NewCookie>();
+        for (final String cookie : HeaderUtils.asStringList(cookies, RuntimeDelegate.getInstance())) {
             if (cookie != null) {
-                NewCookie newCookie = HttpHeaderReader.readNewCookie(cookie);
+                final NewCookie newCookie = HttpHeaderReader.readNewCookie(cookie);
                 result.put(newCookie.getName(), newCookie);
             }
         }
@@ -470,10 +484,10 @@ public class OutboundMessageContext {
     public EntityTag getEntityTag() {
         return singleHeader(HttpHeaders.ETAG, EntityTag.class, new Function<String, EntityTag>() {
             @Override
-            public EntityTag apply(String value) {
+            public EntityTag apply(final String value) {
                 try {
                     return value == null ? null : EntityTag.valueOf(value);
-                } catch (IllegalArgumentException ex) {
+                } catch (final IllegalArgumentException ex) {
                     throw new ProcessingException(ex);
                 }
             }
@@ -488,10 +502,10 @@ public class OutboundMessageContext {
     public Date getLastModified() {
         return singleHeader(HttpHeaders.LAST_MODIFIED, Date.class, new Function<String, Date>() {
             @Override
-            public Date apply(String input) {
+            public Date apply(final String input) {
                 try {
                     return HttpHeaderReader.readDate(input);
-                } catch (ParseException e) {
+                } catch (final ParseException e) {
                     throw new ProcessingException(e);
                 }
             }
@@ -506,10 +520,10 @@ public class OutboundMessageContext {
     public URI getLocation() {
         return singleHeader(HttpHeaders.LOCATION, URI.class, new Function<String, URI>() {
             @Override
-            public URI apply(String value) {
+            public URI apply(final String value) {
                 try {
                     return value == null ? null : URI.create(value);
-                } catch (IllegalArgumentException ex) {
+                } catch (final IllegalArgumentException ex) {
                     throw new ProcessingException(ex);
                 }
             }
@@ -523,7 +537,7 @@ public class OutboundMessageContext {
      * returns {@code null}.
      */
     public Set<Link> getLinks() {
-        List<Object> values = headers.get(HttpHeaders.LINK);
+        final List<Object> values = headers.get(HttpHeaders.LINK);
         if (values == null || values.isEmpty()) {
             return Collections.emptySet();
         }
@@ -538,7 +552,7 @@ public class OutboundMessageContext {
                 conversionApplied = true;
                 try {
                     result.add(Link.valueOf(HeaderUtils.asString(value, rd)));
-                } catch (IllegalArgumentException e) {
+                } catch (final IllegalArgumentException e) {
                     throw exception(HttpHeaders.LINK, value, e);
                 }
             }
@@ -548,7 +562,7 @@ public class OutboundMessageContext {
             // cache converted
             headers.put(HttpHeaders.LINK, new ArrayList<Object>(Collections2.transform(result, new Function<Link, Object>() {
                 @Override
-                public Object apply(Link input) {
+                public Object apply(final Link input) {
                     return input;
                 }
             })));
@@ -564,9 +578,9 @@ public class OutboundMessageContext {
      * @return {@code true} if the for the relation link exists, {@code false}
      * otherwise.
      */
-    public boolean hasLink(String relation) {
-        for (Link link : getLinks()) {
-            List<String> relations = LinkProvider.getLinkRelations(link.getRel());
+    public boolean hasLink(final String relation) {
+        for (final Link link : getLinks()) {
+            final List<String> relations = LinkProvider.getLinkRelations(link.getRel());
             if (relations != null && relations.contains(relation)) {
                 return true;
             }
@@ -580,9 +594,9 @@ public class OutboundMessageContext {
      * @param relation link relation.
      * @return the link for the relation, otherwise {@code null} if not present.
      */
-    public Link getLink(String relation) {
-        for (Link link : getLinks()) {
-            List<String> relations = LinkProvider.getLinkRelations(link.getRel());
+    public Link getLink(final String relation) {
+        for (final Link link : getLinks()) {
+            final List<String> relations = LinkProvider.getLinkRelations(link.getRel());
             if (relations != null && relations.contains(relation)) {
                 return link;
             }
@@ -598,8 +612,8 @@ public class OutboundMessageContext {
      * @return the link builder for the relation, otherwise {@code null} if not
      * present.
      */
-    public Link.Builder getLinkBuilder(String relation) {
-        Link link = getLink(relation);
+    public Link.Builder getLinkBuilder(final String relation) {
+        final Link link = getLink(relation);
         if (link == null) {
             return null;
         }
@@ -611,7 +625,7 @@ public class OutboundMessageContext {
 
     /**
      * Check if there is an entity available in the message.
-     *
+     * <p/>
      * The method returns {@code true} if the entity is present, returns
      * {@code false} otherwise.
      *
@@ -619,18 +633,32 @@ public class OutboundMessageContext {
      * {@code false} otherwise.
      */
     public boolean hasEntity() {
-        return entity != null;
+        return getEntity() != null;
     }
 
     /**
      * Get the message entity Java instance.
-     *
+     * <p/>
      * Returns {@code null} if the message does not contain an entity.
      *
      * @return the message entity or {@code null} if message does not contain an
      * entity body.
      */
     public Object getEntity() {
+        unwrapEntity();
+        return unwrappedEntity;
+    }
+
+    /**
+     * Get the original message entity Java instance set to this context. The entity may be wrapped in another object such as
+     * Optional (JDK8, Guava), Ref, Value, ...
+     * <p/>
+     * Returns {@code null} if the message does not contain an entity.
+     *
+     * @return the original message entity or {@code null} if message does not contain an entity body.
+     * @since 2.18
+     */
+    public Object getWrappedEntity() {
         return entity;
     }
 
@@ -640,7 +668,7 @@ public class OutboundMessageContext {
      * @param entity entity object.
      * @see javax.ws.rs.ext.MessageBodyWriter
      */
-    public void setEntity(Object entity) {
+    public void setEntity(final Object entity) {
         setEntity(entity, ReflectionHelper.genericTypeFor(entity));
     }
 
@@ -651,26 +679,9 @@ public class OutboundMessageContext {
      * @param annotations annotations attached to the entity.
      * @see javax.ws.rs.ext.MessageBodyWriter
      */
-    public void setEntity(Object entity, Annotation[] annotations) {
+    public void setEntity(final Object entity, final Annotation[] annotations) {
         setEntity(entity, ReflectionHelper.genericTypeFor(entity));
         setEntityAnnotations(annotations);
-    }
-
-    /**
-     * Set a new message message entity.
-     *
-     * @param entity entity object.
-     * @param type   entity generic type information.
-     * @see javax.ws.rs.ext.MessageBodyWriter
-     */
-    private void setEntity(Object entity, GenericType<?> type) {
-        if (entity instanceof GenericEntity) {
-            this.entity = ((GenericEntity) entity).getEntity();
-        } else {
-            this.entity = entity;
-        }
-        // ignoring overridden generic entity type information
-        this.entityType = type;
     }
 
     /**
@@ -681,7 +692,7 @@ public class OutboundMessageContext {
      * @param annotations annotations attached to the entity.
      * @see javax.ws.rs.ext.MessageBodyWriter
      */
-    public void setEntity(Object entity, Type type, Annotation[] annotations) {
+    public void setEntity(final Object entity, final Type type, final Annotation[] annotations) {
         setEntity(entity, new GenericType(type));
         setEntityAnnotations(annotations);
     }
@@ -694,9 +705,29 @@ public class OutboundMessageContext {
      * @param mediaType   entity media type.
      * @see javax.ws.rs.ext.MessageBodyWriter
      */
-    public void setEntity(Object entity, Annotation[] annotations, MediaType mediaType) {
+    public void setEntity(final Object entity, final Annotation[] annotations, final MediaType mediaType) {
         setEntity(entity, annotations);
         setMediaType(mediaType);
+    }
+
+    /**
+     * Set a new message message entity.
+     *
+     * @param entity entity object.
+     * @param type   entity generic type information.
+     * @see javax.ws.rs.ext.MessageBodyWriter
+     */
+    private void setEntity(final Object entity, final GenericType<?> type) {
+        if (entity instanceof GenericEntity) {
+            this.entity = ((GenericEntity) entity).getEntity();
+        } else {
+            this.entity = entity;
+        }
+        // ignoring overridden generic entity type information
+        this.entityType = type;
+
+        this.unwrappedEntity = null;
+        this.unwrappedEntityType = null;
     }
 
     /**
@@ -704,7 +735,7 @@ public class OutboundMessageContext {
      *
      * @param mediaType message content media type.
      */
-    public void setMediaType(MediaType mediaType) {
+    public void setMediaType(final MediaType mediaType) {
         this.headers.putSingle(HttpHeaders.CONTENT_TYPE, mediaType);
     }
 
@@ -714,7 +745,8 @@ public class OutboundMessageContext {
      * @return raw message entity type information.
      */
     public Class<?> getEntityClass() {
-        return entityType == null ? null : entityType.getRawType();
+        unwrapEntity();
+        return unwrappedEntityType == null ? null : unwrappedEntityType.getRawType();
     }
 
     /**
@@ -723,17 +755,18 @@ public class OutboundMessageContext {
      * @return message entity type.
      */
     public Type getEntityType() {
-        return entityType == null ? null : entityType.getType();
+        unwrapEntity();
+        return unwrappedEntityType == null ? null : unwrappedEntityType.getType();
     }
 
     /**
      * Set the message entity type information.
-     *
+     * <p/>
      * This method overrides any computed or previously set entity type information.
      *
      * @param type overriding message entity type.
      */
-    public void setEntityType(Type type) {
+    public void setEntityType(final Type type) {
         this.entityType = new GenericType(type);
     }
 
@@ -751,7 +784,7 @@ public class OutboundMessageContext {
      *
      * @param annotations entity annotations.
      */
-    public void setEntityAnnotations(Annotation[] annotations) {
+    public void setEntityAnnotations(final Annotation[] annotations) {
         this.entityAnnotations = (annotations == null) ? EMPTY_ANNOTATIONS : annotations;
     }
 
@@ -769,7 +802,7 @@ public class OutboundMessageContext {
      *
      * @param outputStream new entity output stream.
      */
-    public void setEntityStream(OutputStream outputStream) {
+    public void setEntityStream(final OutputStream outputStream) {
         this.entityStream = outputStream;
     }
 
@@ -782,7 +815,7 @@ public class OutboundMessageContext {
      *
      * @param configuration runtime configuration.
      */
-    public void enableBuffering(Configuration configuration) {
+    public void enableBuffering(final Configuration configuration) {
         final Integer bufferSize = CommonProperties.getValue(configuration.getProperties(),
                 configuration.getRuntimeType(), CommonProperties.OUTBOUND_CONTENT_LENGTH_BUFFER, Integer.class);
         if (bufferSize != null) {
@@ -799,10 +832,9 @@ public class OutboundMessageContext {
      *
      * @param streamProvider non-{@code null} output stream provider.
      */
-    public void setStreamProvider(StreamProvider streamProvider) {
+    public void setStreamProvider(final StreamProvider streamProvider) {
         committingOutputStream.setStreamProvider(streamProvider);
     }
-
 
     /**
      * Commits the {@link #getEntityStream() entity stream} if it wasn't already committed.
@@ -837,7 +869,7 @@ public class OutboundMessageContext {
                 final OutputStream es = getEntityStream();
                 es.flush();
                 es.close();
-            } catch (IOException e) {
+            } catch (final IOException e) {
                 // Happens when the client closed connection before receiving the full response.
                 // This is OK and not interesting in vast majority of the cases
                 // hence the log level set to FINE to make sure it does not flood the log unnecessarily
@@ -849,10 +881,40 @@ public class OutboundMessageContext {
                 if (!committingOutputStream.isClosed()) {
                     try {
                         committingOutputStream.close();
-                    } catch (IOException e) {
+                    } catch (final IOException e) {
                         // Just log the exception
                         Logger.getLogger(OutboundMessageContext.class.getName()).log(Level.FINE, e.getMessage(), e);
                     }
+                }
+            }
+        }
+    }
+
+    /**
+     * Set {@link org.glassfish.jersey.message.internal.spi.EntityChangeInterceptor entity change interceptors} to this context.
+     *
+     * @param entityInterceptors entity change interceptors to be set
+     */
+    public void setEntityInterceptors(final Iterable<EntityChangeInterceptor> entityInterceptors) {
+        this.entityInterceptors = entityInterceptors == null
+                ? Collections.<EntityChangeInterceptor>emptyList()
+                : entityInterceptors;
+    }
+
+    /**
+     * Unwrap entity and entity type in case it's wrapped in other object (e.g. Optional, Ref, Value, ..).
+     */
+    private void unwrapEntity() {
+        unwrappedEntity = entity;
+        unwrappedEntityType = entityType;
+
+        if (entity != null) {
+            for (final EntityChangeInterceptor interceptor : entityInterceptors) {
+                final GenericType unwrappedType = interceptor.unwrapType(entityType, entity);
+
+                if (unwrappedType != this.entityType) {
+                    unwrappedEntity = interceptor.unwrapEntity(entity);
+                    unwrappedEntityType = unwrappedType;
                 }
             }
         }

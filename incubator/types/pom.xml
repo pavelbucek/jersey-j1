@@ -3,7 +3,7 @@
 
     DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS HEADER.
 
-    Copyright (c) 2011-2015 Oracle and/or its affiliates. All rights reserved.
+    Copyright (c) 2015 Oracle and/or its affiliates. All rights reserved.
 
     The contents of this file are subject to the terms of either the GNU
     General Public License Version 2 only ("GPL") or the Common Development
@@ -42,28 +42,36 @@
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
     <parent>
-        <groupId>org.glassfish.jersey</groupId>
+        <groupId>org.glassfish.jersey.incubator</groupId>
         <artifactId>project</artifactId>
         <version>3.0-J1-SNAPSHOT</version>
     </parent>
 
-    <groupId>org.glassfish.jersey.incubator</groupId>
+    <groupId>org.glassfish.jersey.ext.types</groupId>
     <artifactId>project</artifactId>
     <packaging>pom</packaging>
-    <name>jersey-incubator</name>
+    <name>jersey-ext-types</name>
 
     <description>
-        Jersey incubator for experimental modules that are in a prototyping or research stage,
+        Jersey incubator for various types (e.g. Java 8 types) modules that are in a prototyping or research stage,
         not ready to be released as part of Jersey (yet).
     </description>
 
     <modules>
-        <module>declarative-linking</module>
-        <module>gae-integration</module>
-        <module>html-json</module>
-        <module>kryo</module>
-        <module>types</module>
     </modules>
 
+    <dependencies>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest-library</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 </project>

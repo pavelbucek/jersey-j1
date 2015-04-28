@@ -43,20 +43,20 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Type;
 import java.util.List;
 
+import javax.inject.Inject;
 import javax.ws.rs.ProcessingException;
 import javax.ws.rs.core.GenericEntity;
 import javax.ws.rs.core.Response;
 
-import javax.inject.Inject;
-
+import org.glassfish.hk2.api.ServiceLocator;
+import org.glassfish.jersey.internal.inject.Providers;
+import org.glassfish.jersey.message.internal.spi.EntityChangeInterceptor;
 import org.glassfish.jersey.server.ContainerRequest;
 import org.glassfish.jersey.server.internal.inject.ConfiguredValidator;
 import org.glassfish.jersey.server.model.Invocable;
 import org.glassfish.jersey.server.spi.internal.ParamValueFactoryWithSource;
 import org.glassfish.jersey.server.spi.internal.ParameterValueHelper;
 import org.glassfish.jersey.server.spi.internal.ResourceMethodDispatcher;
-
-import org.glassfish.hk2.api.ServiceLocator;
 
 /**
  * An implementation of {@link ResourceMethodDispatcher.Provider} that
@@ -76,19 +76,24 @@ class JavaResourceMethodDispatcherProvider implements ResourceMethodDispatcher.P
             final ConfiguredValidator validator) {
         final List<ParamValueFactoryWithSource<?>> valueProviders =
                 ParameterValueHelper.createValueProviders(serviceLocator, resourceMethod);
+
         final Class<?> returnType = resourceMethod.getHandlingMethod().getReturnType();
 
-        ResourceMethodDispatcher resourceMethodDispatcher;
+        final ResourceMethodDispatcher resourceMethodDispatcher;
         if (Response.class.isAssignableFrom(returnType)) {
             resourceMethodDispatcher =
                     new ResponseOutInvoker(resourceMethod, invocationHandler, valueProviders, validator);
         } else if (returnType != void.class) {
+            // Entity change interceptors.
+            final Iterable<EntityChangeInterceptor> entityInterceptors =
+                    Providers.getAllProviders(serviceLocator, EntityChangeInterceptor.class);
+
             if (returnType == Object.class || GenericEntity.class.isAssignableFrom(returnType)) {
-                resourceMethodDispatcher =
-                        new ObjectOutInvoker(resourceMethod, invocationHandler, valueProviders, validator);
+                resourceMethodDispatcher = new ObjectOutInvoker(resourceMethod, invocationHandler, valueProviders, validator,
+                        entityInterceptors);
             } else {
-                resourceMethodDispatcher =
-                        new TypeOutInvoker(resourceMethod, invocationHandler, valueProviders, validator);
+                resourceMethodDispatcher = new TypeOutInvoker(resourceMethod, invocationHandler, valueProviders, validator,
+                        entityInterceptors);
             }
         } else {
             resourceMethodDispatcher
@@ -126,6 +131,21 @@ class JavaResourceMethodDispatcherProvider implements ResourceMethodDispatcher.P
         final Object[] getParamValues() {
             return ParameterValueHelper.getParameterValues(valueProviders);
         }
+
+        static boolean hasEntity(final Object entity,
+                                 final Iterable<EntityChangeInterceptor> interceptors) {
+            if (entity == null) {
+                return false;
+            }
+
+            for (final EntityChangeInterceptor interceptor : interceptors) {
+                if (interceptor.unwrapEntity(entity) == null) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
     }
 
     private static final class VoidOutInvoker extends AbstractMethodParamInvoker {
@@ -156,19 +176,23 @@ class JavaResourceMethodDispatcherProvider implements ResourceMethodDispatcher.P
         }
 
         @Override
-        protected Response doDispatch(Object resource, final ContainerRequest containerRequest) throws ProcessingException {
+        protected Response doDispatch(final Object resource, final ContainerRequest containerRequest) throws ProcessingException {
             return Response.class.cast(invoke(containerRequest, resource, getParamValues()));
         }
     }
 
     private static final class ObjectOutInvoker extends AbstractMethodParamInvoker {
 
+        private final Iterable<EntityChangeInterceptor> interceptors;
+
         public ObjectOutInvoker(
                 final Invocable resourceMethod,
                 final InvocationHandler handler,
                 final List<ParamValueFactoryWithSource<?>> valueProviders,
-                final ConfiguredValidator validator) {
+                final ConfiguredValidator validator, final Iterable<EntityChangeInterceptor> interceptors) {
             super(resourceMethod, handler, valueProviders, validator);
+
+            this.interceptors = interceptors;
         }
 
         @Override
@@ -177,9 +201,9 @@ class JavaResourceMethodDispatcherProvider implements ResourceMethodDispatcher.P
 
             if (o instanceof Response) {
                 return Response.class.cast(o);
-//            } else if (o instanceof JResponse) {
-//                context.getResponseContext().setResponse(((JResponse)o).toResponse());
-            } else if (o != null) {
+                // } else if (o instanceof JResponse) {
+                //     context.getResponseContext().setResponse(((JResponse)o).toResponse());
+            } else if (hasEntity(o, interceptors)) {
                 return Response.ok().entity(o).build();
             } else {
                 return Response.noContent().build();
@@ -190,25 +214,28 @@ class JavaResourceMethodDispatcherProvider implements ResourceMethodDispatcher.P
     private static final class TypeOutInvoker extends AbstractMethodParamInvoker {
 
         private final Type t;
+        private final Iterable<EntityChangeInterceptor> interceptors;
 
         public TypeOutInvoker(
                 final Invocable resourceMethod,
                 final InvocationHandler handler,
                 final List<ParamValueFactoryWithSource<?>> valueProviders,
-                final ConfiguredValidator validator) {
+                final ConfiguredValidator validator, final Iterable<EntityChangeInterceptor> interceptors) {
             super(resourceMethod, handler, valueProviders, validator);
+
             this.t = resourceMethod.getHandlingMethod().getGenericReturnType();
+            this.interceptors = interceptors;
         }
 
         @Override
         protected Response doDispatch(final Object resource, final ContainerRequest containerRequest) throws ProcessingException {
             final Object o = invoke(containerRequest, resource, getParamValues());
-            if (o != null) {
 
-                Response response = Response.ok().entity(o).build();
+            if (hasEntity(o, interceptors)) {
+                final Response response = Response.ok().entity(o).build();
                 // TODO set the method return Java type to the proper context.
-//                Response r = new ResponseBuilderImpl().
-//                        entityWithType(o, t).status(200).build();
+                // Response r = new ResponseBuilderImpl().
+                //     entityWithType(o, t).status(200).build();
                 return response;
             } else {
                 return Response.noContent().build();

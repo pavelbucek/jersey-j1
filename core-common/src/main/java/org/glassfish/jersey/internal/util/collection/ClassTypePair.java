@@ -1,7 +1,7 @@
 /*
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS HEADER.
  *
- * Copyright (c) 2011-2012 Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011-2015 Oracle and/or its affiliates. All rights reserved.
  *
  * The contents of this file are subject to the terms of either the GNU
  * General Public License Version 2 only ("GPL") or the Common Development
@@ -51,9 +51,9 @@ public final class ClassTypePair {
     private final Type type;
     private final Class<?> rawClass;
 
-    private ClassTypePair(Class<?> c, Type t) {
-        this.type = t;
-        this.rawClass = c;
+    private ClassTypePair(final Class<?> rawClass, final Type type) {
+        this.type = type;
+        this.rawClass = rawClass;
     }
 
     /**
@@ -78,10 +78,9 @@ public final class ClassTypePair {
      * Create new type-class pair for a non-generic class.
      *
      * @param rawClass (raw) class representing the non-generic type.
-     *
      * @return new non-generic type-class pair.
      */
-    public static ClassTypePair of(Class<?> rawClass) {
+    public static ClassTypePair of(final Class<?> rawClass) {
         return new ClassTypePair(rawClass, rawClass);
     }
 
@@ -89,11 +88,10 @@ public final class ClassTypePair {
      * Create new type-class pair.
      *
      * @param rawClass raw class representing the type.
-     * @param type type behind the class.
-     *
+     * @param type     type behind the class.
      * @return new type-class pair.
      */
-    public static ClassTypePair of(Class<?> rawClass, Type type) {
+    public static ClassTypePair of(final Class<?> rawClass, final Type type) {
         return new ClassTypePair(rawClass, type);
     }
 }

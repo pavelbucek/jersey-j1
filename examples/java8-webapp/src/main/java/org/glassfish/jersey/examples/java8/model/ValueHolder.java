@@ -38,33 +38,50 @@
  * holder.
  */
 
-package org.glassfish.jersey.examples.java8;
-
-import javax.ws.rs.ApplicationPath;
-
-import org.glassfish.jersey.examples.java8.resources.DefaultMethodResource;
-import org.glassfish.jersey.examples.java8.resources.LambdaResource;
-import org.glassfish.jersey.examples.java8.resources.OptionalResource;
-import org.glassfish.jersey.jackson.JacksonFeature;
-import org.glassfish.jersey.java8.Java8TypesFeature;
-import org.glassfish.jersey.server.ResourceConfig;
+package org.glassfish.jersey.examples.java8.model;
 
 /**
- * Application for illustrating some of the features of Java 8 in JAX-RS.
- *
- * @author Michal Gajdos
+ * @author Michal Gajdos (michal.gajdos at oracle.com)
  */
-@ApplicationPath("j8")
-public class Java8Application extends ResourceConfig {
+public class ValueHolder {
 
-    public Java8Application() {
-        // Features/Providers.
-        register(Java8TypesFeature.class);
-        register(JacksonFeature.class);
+    private String value;
 
-        // Resources.
-        register(OptionalResource.class);
-        register(DefaultMethodResource.class);
-        register(LambdaResource.class);
+    public ValueHolder() {
+    }
+
+    public ValueHolder(final String value) {
+        this.value = value;
+    }
+
+    public String getValue() {
+        return value;
+    }
+
+    public void setValue(final String value) {
+        this.value = value;
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        final ValueHolder that = (ValueHolder) o;
+
+        if (value != null ? !value.equals(that.value) : that.value != null) {
+            return false;
+        }
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        return value != null ? value.hashCode() : 0;
     }
 }

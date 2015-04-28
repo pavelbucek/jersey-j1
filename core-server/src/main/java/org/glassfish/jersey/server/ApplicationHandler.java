@@ -94,6 +94,7 @@ import org.glassfish.jersey.internal.util.collection.Value;
 import org.glassfish.jersey.internal.util.collection.Values;
 import org.glassfish.jersey.message.MessageBodyWorkers;
 import org.glassfish.jersey.message.internal.NullOutputStream;
+import org.glassfish.jersey.message.internal.spi.EntityChangeInterceptor;
 import org.glassfish.jersey.model.ContractProvider;
 import org.glassfish.jersey.model.internal.ComponentBag;
 import org.glassfish.jersey.model.internal.RankedComparator;
@@ -844,6 +845,9 @@ public final class ApplicationHandler implements ContainerLifecycleListener {
 
         final Iterable<DynamicFeature> dynamicFeatures = Providers.getAllProviders(locator, DynamicFeature.class);
 
+        final Iterable<EntityChangeInterceptor> entityInterceptors =
+                Providers.getAllProviders(locator, EntityChangeInterceptor.class);
+
         return new ProcessingProviders(nameBoundReqFilters,
                 nameBoundReqFiltersInverse,
                 nameBoundResponseFilters,
@@ -857,7 +861,8 @@ public final class ApplicationHandler implements ContainerLifecycleListener {
                 responseFilters,
                 readerInterceptors,
                 writerInterceptors,
-                dynamicFeatures);
+                dynamicFeatures,
+                entityInterceptors);
     }
 
     private ResourceModel processResourceModel(ResourceModel resourceModel) {
