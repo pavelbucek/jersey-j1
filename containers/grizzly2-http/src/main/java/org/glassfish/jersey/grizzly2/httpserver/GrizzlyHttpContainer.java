@@ -76,6 +76,7 @@ import org.glassfish.jersey.server.spi.RequestScopedInitializer;
 
 import org.glassfish.hk2.api.ServiceLocator;
 import org.glassfish.hk2.api.TypeLiteral;
+import org.glassfish.hk2.utilities.Binder;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 
 import org.glassfish.grizzly.CompletionHandler;
@@ -145,7 +146,7 @@ public final class GrizzlyHttpContainer extends HttpHandler implements Container
      * the injection of Grizzly request instance into singleton JAX-RS and Jersey providers is only supported via
      * {@link javax.inject.Provider injection provider}.
      */
-    static class GrizzlyBinder extends AbstractBinder {
+    public static class GrizzlyBinder extends AbstractBinder {
 
         @Override
         protected void configure() {
@@ -327,6 +328,19 @@ public final class GrizzlyHttpContainer extends HttpHandler implements Container
     }
 
     private volatile ApplicationHandler appHandler;
+
+
+    /**
+     * XX
+     *
+     * @param application XX
+     * @param binders     XX
+     */
+    public GrizzlyHttpContainer(Application application, Binder[] binders) {
+        this.appHandler = new ApplicationHandler(application, binders);
+        cacheConfigSetStatusOverSendError();
+        cacheConfigEnableLeadingContextPathSlashes();
+    }
 
     /**
      * Create a new Grizzly HTTP container.

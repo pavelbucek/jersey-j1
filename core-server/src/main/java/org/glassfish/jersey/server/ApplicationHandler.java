@@ -313,6 +313,56 @@ public final class ApplicationHandler implements ContainerLifecycleListener {
 
     /**
      * Create a new Jersey server-side application handler configured by an instance
+     * of a {@link ResourceConfig} and a custom {@link Binder}.
+     *
+     * @param application  an instance of a JAX-RS {@code Application} (sub-)class that
+     *                     will be used to configure the new Jersey application handler.
+     * @param customBinders additional custom bindings used to configure the application's {@link ServiceLocator}.
+     */
+    public ApplicationHandler(final Application application, final Binder... customBinders) {
+
+        if (customBinders == null) {
+            this.locator = Injections.createLocator(
+                    (ServiceLocator) null,
+                    new ServerBinder(application.getProperties()),
+                    new ApplicationBinder());
+        } else {
+            final Binder[] binders = new Binder[customBinders.length + 2];
+
+            binders[0] = new ServerBinder(application.getProperties());
+            binders[1] = new ApplicationBinder();
+            System.arraycopy(customBinders, 0, binders, 2, customBinders.length);
+
+            this.locator = Injections.createLocator(
+                    (ServiceLocator) null,
+                    binders);
+        }
+        locator.setDefaultClassAnalyzerName(JerseyClassAnalyzer.NAME);
+        final LazyValue<Iterable<ComponentProvider>> componentProviders = getLazyInitializedComponentProviders(locator);
+
+        this.application = application;
+        if (application instanceof ResourceConfig) {
+            final ResourceConfig rc = (ResourceConfig) application;
+            if (rc.getApplicationClass() != null) {
+                rc.setApplication(createApplication(rc.getApplicationClass(), componentProviders));
+            }
+        }
+        this.runtimeConfig = ResourceConfig.createRuntimeConfig(application);
+
+        this.runtime = Errors.processWithException(new Producer<ServerRuntime>() {
+            @Override
+            public ServerRuntime call() {
+                return initialize(componentProviders.get());
+            }
+        });
+
+        this.containerLifecycleListeners = Providers.getAllProviders(locator, ContainerLifecycleListener.class);
+
+    }
+
+
+    /**
+     * Create a new Jersey server-side application handler configured by an instance
      * of a {@link ResourceConfig}, custom {@link Binder} and a parent {@link org.glassfish.hk2.api.ServiceLocator}.
      *
      * @param application  an instance of a JAX-RS {@code Application} (sub-)class that

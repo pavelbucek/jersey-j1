@@ -45,6 +45,7 @@ import javax.ws.rs.core.Application;
 import org.glassfish.jersey.server.spi.ContainerProvider;
 
 import org.glassfish.grizzly.http.server.HttpHandler;
+import org.glassfish.hk2.utilities.Binder;
 
 /**
  * Container provider for containers based on Grizzly {@link org.glassfish.grizzly.http.server.HttpHandler}.
@@ -62,4 +63,13 @@ public class GrizzlyHttpContainerProvider implements ContainerProvider {
 
         return null;
     }
+
+    public <T> T createContainer(Class<T> type, Application application, Binder... binders) throws ProcessingException {
+        if (HttpHandler.class == type || GrizzlyHttpContainer.class == type) {
+            return type.cast(new GrizzlyHttpContainer(application, binders));
+        }
+
+        return null;
+    }
+
 }
