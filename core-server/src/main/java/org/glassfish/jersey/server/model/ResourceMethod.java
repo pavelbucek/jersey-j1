@@ -517,6 +517,10 @@ public final class ResourceMethod implements ResourceModelComponent, Producing, 
             return this;
         }
 
+        public Resource.Builder parent() {
+            return parent.parent();
+        }
+
         /**
          * Build the resource method model and register it with the parent
          * {@link Resource.Builder Resource.Builder}.

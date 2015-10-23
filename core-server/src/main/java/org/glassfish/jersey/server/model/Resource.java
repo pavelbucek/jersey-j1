@@ -440,6 +440,10 @@ public final class Resource implements Routed, ResourceModelComponent {
             return this;
         }
 
+        public Builder parent() {
+            return parentResource;
+        }
+
         /**
          * Get the flag indicating whether the resource method is extended or is a core of exposed RESTful API.
          *
